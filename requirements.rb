@@ -1,8 +1,15 @@
-require 'socket'
-require 'securerandom'
-require 'json'
+requirements = %w(
+  socket
+  securerandom
+  json
+  sinatra/base
+  active_record
+  ./database
+  ./server
+  ./api
+)
 
-require './communication/packet'
-require './communication/message'
-require './communication/connection'
-require './server'
+requirements += Dir['./communication/*']
+requirements += Dir['./models/*']
+
+requirements.each { |requirement| require requirement }

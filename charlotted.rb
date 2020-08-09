@@ -1,3 +1,4 @@
 require './requirements'
 
-Server.new
+Thread.new { Server.new }
+API.run! host: 'localhost', port: 1234

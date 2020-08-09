@@ -1,5 +1,8 @@
 require 'socket'
+require 'securerandom'
 require 'json'
 
-require './packet'
+require './communication/packet'
+require './communication/message'
+require './communication/connection'
 require './server'

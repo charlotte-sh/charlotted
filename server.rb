@@ -1,78 +1,56 @@
 class Server
   PORT = 1654
-  WORKSPACE = 'Charlotte'
+  WORKSPACE = 'charlotte'
 
   def initialize
     @server = TCPServer.open(PORT)
-    @clients = {}
+    @connections = {}
     run
-  end
-
-  def send_packet(connection, channel, **data)
-    connection.puts Packet.new(channel, **data)
   end
 
   private
 
   def run
-    Socket.accept_loop(@server) do |connection|
-      Thread.new { handle(connection) }
+    Socket.accept_loop(@server) do |socket|
+      connection = Connection.new socket,
+        on_request: -> (message) { on_request(message) },
+        on_close: -> (connection) { on_close(connection) }
+
+      @connections[connection] = {}
+      puts 'connected'
     end
   end
 
-  def handle(connection)
-    loop do
-      if connection.eof?
-        on_disconnect(connection)
-      elsif @clients[connection].nil?
-        on_handshake(connection)
-      else
-        on_message(connection)
-      end
-    end
-  end
+  def on_request(request)
+    case request.channel
+    when :authentication
+      username = request.data.dig(:username)
+      @connections[request.connection][:username] = username
+      request.respond(
+        username: username,
+        workspace: WORKSPACE
+      )
 
-  def on_handshake(connection)
-    packet = Packet.parse(connection.gets.chomp)
-    username = packet.data.dig(:username)
-    @clients[connection] = username
+    when :machines
+      request.respond machines: ['guest']
 
-    send_packet connection, :handshake,
-      workspace: WORKSPACE,
-      account: username,
-      machines: @clients.values
+    when :chat
+      message = request.data.dig(:message)
 
-    puts "#{@clients[connection]} connected"
-  end
-
-  def on_message(connection)
-    packet = Packet.parse(connection.gets.chomp)
-
-    case packet.channel
-    when 'chat'
-      message = packet.data.dig(:message)
       unless message.empty?
-        @clients.each do |client, username|
-          send_packet client, :chat,
-            username: @clients[connection],
+        @connections.each do |connection, meta|
+          next if connection == request.connection
+
+          connection.request :chat,
+            username: @connections[request.connection].dig(:username),
             message: message
         end
-
-        puts "#{@clients[connection]} sent a message"
       end
-    when 'machines'
-      send_packet connection, :machines,
-        machines: @clients.values
     end
   end
 
-  def on_disconnect(connection)
-    unless @clients[connection].nil?
-      puts "#{@clients[connection]} disconnected"
-      @clients.delete(connection)
-    end
-
-    connection.close
-    Thread.stop
+  def on_close(connection)
+    puts "disconnected"
+    @connections.delete(connection)
   end
 end

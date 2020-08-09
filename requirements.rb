@@ -3,6 +3,7 @@ requirements = %w(
   securerandom
   json
   sinatra/base
+  sinatra/json
   active_record
   ./database
   ./server

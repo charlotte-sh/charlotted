@@ -32,7 +32,17 @@ class Server
       )
 
     when :machines
-      request.respond machines: ['guest']
+      machines = @connections.values.map { |x| x.dig(:username) }
+      request.respond machines: machines
+
+    when :shell
+      username = request.data.dig(:username)
+      session = Session.find_by(username: username)
+      source_connection = request.connection
+      target_connection = @connections.select { |k, v| v.dig(:username) == username }.first.first
+      [source_connection, target_connection].each do |connection|
+        connection.request :shell, address: session.address
+      end
 
     when :chat
       message = request.data.dig(:message)
